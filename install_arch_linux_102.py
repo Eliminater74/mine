@@ -1,52 +1,53 @@
 import os
 import subprocess
+import re
 
 
 def display_intro():
     os.system('clear')
-    print("=" * 50)
-    print("   Arch Linux Installation Helper - Python Edition")
-    print("=" * 50)
-    print("\nWelcome to the Arch Linux installation helper!")
-    print("This script provides a guided approach to installing Arch Linux with various customizable options.")
+    print("=" * 80)
+    print(" " * 15 + "Arch BTRFS Installation Script By Eliminater74")
+    print(" " * 25 + "Year: 2023")
+    print("=" * 80)
     
-    print("\nFeatures:")
+    print("\nWelcome to the Arch Linux BTRFS Installation Helper!")
+    print("This advanced script is designed to simplify the process of installing Arch Linux with BTRFS as the filesystem.")
+    print("With a focus on user-friendliness and customization, it provides a seamless experience even for beginners.")
+    
+    print("\nKey Features:")
     features = [
-        "Interactive selection from connected drives.",
-        "Option to format partitions with a warning prompt.",
-        "Creation of Btrfs subvolumes.",
-        "Mounting of the file system.",
-        "Installation of essential packages.",
-        "Configuration of fstab.",
-        "Option to chroot into the system.",
-        "Setting of the time zone based on current settings.",
-        "Localization setup.",
-        "Network configuration options including wired and Wi-Fi.",
-        "Installation of KDE packages.",
-        "Option to install additional packages.",
-        "Custom package installation.",
-        "zRAM setup.",
-        "Enabling of necessary services.",
-        "Configuration of Pacman repositories.",
-        "Setup of Chaotic-AUR.",
-        "Setup of CachyOS Repository."
+        "Interactive drive selection from connected devices.",
+        "LUKS encryption for enhanced security.",
+        "Btrfs filesystem setup with optional compression.",
+        "Creation and management of Btrfs subvolumes.",
+        "Automatic mounting of the filesystem.",
+        "Installation of essential and custom packages.",
+        "Time zone and localization configuration.",
+        "Network setup for both wired and Wi-Fi connections.",
+        "Desktop environment installation options.",
+        "zRAM setup for improved performance.",
+        "Service management and activation.",
+        "Pacman repository configuration.",
+        "Integration of Chaotic-AUR and CachyOS Repository.",
+        "Kernel selection based on user preference.",
+        "User and root password management."
     ]
     for feature in features:
         print(f"- {feature}")
     
-    print("\nGuidelines:")
+    print("\nInstructions:")
     guidelines = [
-        "Use the numbers provided to navigate through the menu options.",
-        "Follow the on-screen prompts attentively.",
-        "Ensure you have an active internet connection when prompted.",
-        "It's highly recommended to run this script from a Live Arch Linux environment.",
-        "Always backup important data before making changes to drives or partitions."
+        "Navigate using the numbers provided in the menu.",
+        "Follow on-screen prompts carefully.",
+        "Ensure a stable internet connection when required.",
+        "Recommended to run from a Live Arch Linux environment.",
+        "Backup crucial data before making changes to drives or partitions."
     ]
     for idx, guideline in enumerate(guidelines, 1):
         print(f"{idx}. {guideline}")
     
-    print("\nDisclaimer: Proceed at your own risk!")
-    input("\nPress Enter to continue to the main menu...")
+    print("\nDisclaimer: Use this script at your own risk. Always ensure backups before making system changes.")
+    input("\nPress Enter to proceed to the main menu...")
 
 
 def run_command(cmd):
@@ -95,6 +96,27 @@ def get_connected_drives():
     return drives
 
 
+def setup_luks_encryption(drive):
+    while True:
+        passphrase = input("Enter a passphrase for LUKS encryption: ")
+        if not is_strong_password(passphrase):
+            print("Weak passphrase! Ensure it's at least 8 characters long, contains lowercase, uppercase, numbers, and special characters.")
+            continue
+        confirm_passphrase = input("Confirm passphrase: ")
+
+        if passphrase != confirm_passphrase:
+            print("Passphrases do not match!")
+            continue
+        break
+
+    # Encrypt the partition
+    run_command(f"echo -n {passphrase} | cryptsetup luksFormat {drive} -")
+
+    # Open the encrypted partition
+    run_command(f"echo -n {passphrase} | cryptsetup open {drive} cryptroot -")
+
+    return "/dev/mapper/cryptroot"  # Return the path to the opened encrypted partition
+
 def format_partitions(drive):
     if not drive:
         print("No drive selected!")
@@ -108,8 +130,12 @@ def format_partitions(drive):
         print("Operation cancelled.")
         return
 
+    encrypt_choice = input("Do you want to enable LUKS encryption? (y/n): ")
+    if encrypt_choice.lower() == "y":
+        drive = setup_luks_encryption(drive)
+
     choice = input("Do you want to enable Btrfs compression? (y/n): ")
-    if choice == "y":
+    if choice.lower() == "y":
         run_command(f"mkfs.btrfs -f --compress=zstd {drive}")
     else:
         run_command(f"mkfs.btrfs -f {drive}")
@@ -137,6 +163,8 @@ def configure_fstab():
 
 
 def chroot_into_system():
+    virt_check()  # Check for virtualization and install guest tools
+    install_microcode()  # Check and install the appropriate microcode
     run_command("arch-chroot /mnt")
 
 
@@ -190,10 +218,6 @@ def network_configuration():
             return
         else:
             print("Invalid choice!")
-
-
-def install_kde_packages():
-    run_command("pacman -S plasma-meta plasma-wayland-session kde-utilities kde-system dolphin-plugins sddm sddm-kcm kde-graphics ksysguard")
 
 
 def install_additional_packages():
@@ -288,6 +312,231 @@ def setup_cachyos_repo():
         'echo -e "\n[cachyos]\nInclude = /etc/pacman.d/cachyos-mirrorlist" >> /etc/pacman.conf')
     print("CachyOS repository setup complete!")
 
+def install_desktop_environment():
+    while True:
+        clear_screen()
+        print("Desktop Environment Installation Menu")
+        print("1) Install KDE Plasma")
+        print("2) Install GNOME")
+        print("3) Return to main menu")
+        
+        choice = input("Enter your choice: ")
+        
+        if choice == "1":
+            install_kde_plasma()
+            install_xorg_option()
+        elif choice == "2":
+            install_gnome()
+            install_xorg_option()
+        elif choice == "3":
+            return
+        else:
+            print("Invalid choice!")
+        input("Press any key to return to the Desktop Environment Installation Menu...")
+
+def install_kde_plasma():
+    run_command("pacman -S plasma-meta plasma-wayland-session kde-utilities kde-system dolphin-plugins sddm sddm-kcm kde-graphics ksysguard")
+
+def install_gnome():
+    run_command("pacman -S gnome gnome-extra gdm")
+
+def install_xorg_option():
+    choice = input("Do you want to install Xorg-related packages? (y/n): ")
+    if choice.lower() == "y":
+        run_command("pacman -S xorg-server xorg-apps")
+
+
+def virt_check():
+    hypervisor = run_command("systemd-detect-virt").stdout.strip()
+
+    if hypervisor == "kvm":
+        print("KVM has been detected, setting up guest tools.")
+        run_command("pacstrap /mnt qemu-guest-agent")
+        run_command("systemctl enable qemu-guest-agent --root=/mnt")
+        
+    elif hypervisor == "vmware":
+        print("VMWare Workstation/ESXi has been detected, setting up guest tools.")
+        run_command("pacstrap /mnt open-vm-tools")
+        run_command("systemctl enable vmtoolsd --root=/mnt")
+        run_command("systemctl enable vmware-vmblock-fuse --root=/mnt")
+        
+    elif hypervisor == "oracle":
+        print("VirtualBox has been detected, setting up guest tools.")
+        run_command("pacstrap /mnt virtualbox-guest-utils")
+        run_command("systemctl enable vboxservice --root=/mnt")
+        
+    elif hypervisor == "microsoft":
+        print("Hyper-V has been detected, setting up guest tools.")
+        run_command("pacstrap /mnt hyperv")
+        run_command("systemctl enable hv_fcopy_daemon --root=/mnt")
+        run_command("systemctl enable hv_kvp_daemon --root=/mnt")
+        run_command("systemctl enable hv_vss_daemon --root=/mnt")
+
+    else:
+        print(f"Unknown or no virtualization detected: {hypervisor}")
+
+
+def install_microcode():
+    # Detect the CPU vendor
+    cpu_vendor = run_command("grep -m 1 'vendor_id' /proc/cpuinfo").stdout
+
+    if "Intel" in cpu_vendor:
+        print("Intel CPU detected. Installing intel-ucode...")
+        run_command("pacman -S intel-ucode")
+    elif "AMD" in cpu_vendor:
+        print("AMD CPU detected. Installing amd-ucode...")
+        run_command("pacman -S amd-ucode")
+    else:
+        print("Unknown CPU vendor. Skipping microcode installation.")
+
+
+def set_root_password():
+    while True:
+        password = input("Enter the root password: ")
+        confirm_password = input("Confirm the root password: ")
+
+        if password != confirm_password:
+            print("Passwords do not match. Please try again.")
+            continue
+
+        if not is_strong_password(password):
+            print("Password is too weak. Please choose a stronger password.")
+            print("A strong password contains at least 8 characters, a mix of upper and lower case letters, numbers, and special characters.")
+            continue
+
+        # Set the root password
+        result = run_command(f'echo "root:{password}" | chpasswd')
+        if result.returncode == 0:
+            print("Root password set successfully!")
+            break
+        else:
+            print("Error setting root password. Please try again.")
+
+def is_strong_password(password):
+    # Check password length
+    if len(password) < 8:
+        return False
+
+    # Check for at least one uppercase letter
+    if not re.search(r'[A-Z]', password):
+        return False
+
+    # Check for at least one lowercase letter
+    if not re.search(r'[a-z]', password):
+        return False
+
+    # Check for at least one number
+    if not re.search(r'[0-9]', password):
+        return False
+
+    # Check for at least one special character
+    special_characters = re.compile('[@_!#$%^&*()<>?/\\|}{~:]')
+    if not special_characters.search(password):
+        return False
+
+    return True
+
+
+def create_user():
+    while True:
+        username = input("Enter the desired username: ")
+
+        # Check if the username already exists
+        result = run_command(f"id {username}")
+        if result.returncode == 0:
+            print(f"The username {username} already exists. Please choose a different username.")
+            continue
+
+        # Set password for the new user
+        while True:
+            password = input(f"Enter password for {username}: ")
+            confirm_password = input(f"Confirm password for {username}: ")
+
+            if password != confirm_password:
+                print("Passwords do not match. Please try again.")
+                continue
+
+            if not is_strong_password(password):
+                print("Password is too weak. Please choose a stronger password.")
+                print("A strong password contains at least 8 characters, a mix of upper and lower case letters, numbers, and special characters.")
+                continue
+
+            # Create the user and set the password
+            run_command(f"useradd -m {username}")
+            result = run_command(f'echo "{username}:{password}" | chpasswd')
+            if result.returncode == 0:
+                print(f"User {username} created successfully!")
+                break
+            else:
+                print(f"Error setting password for {username}. Please try again.")
+                continue
+
+        break
+
+
+def set_hostname():
+    while True:
+        hostname = input("Enter the desired hostname for your system: ")
+
+        # Check if the hostname is valid
+        if not is_valid_hostname(hostname):
+            print("Invalid hostname. Please enter a valid hostname.")
+            continue
+
+        # Set the hostname
+        result = run_command(f'echo "{hostname}" > /etc/hostname')
+        if result.returncode == 0:
+            print(f"Hostname set to {hostname} successfully!")
+            break
+        else:
+            print(f"Error setting hostname to {hostname}. Please try again.")
+            continue
+
+def is_valid_hostname(hostname):
+    if len(hostname) > 255:
+        return False
+    if hostname[-1] == ".":
+        hostname = hostname[:-1]  # strip exactly one dot from the right, if present
+    allowed = re.compile("(?!-)[A-Z\d-]{1,63}(?<!-)$", re.IGNORECASE)
+    return all(allowed.match(x) for x in hostname.split("."))
+
+
+def kernel_selector():
+    while True:
+        clear_screen()
+        print("Kernel Selector")
+        print("-" * 25)
+        print("Choose a kernel:")
+        print("1) linux (Standard Arch Kernel)")
+        print("2) linux-lts (Long Term Support Kernel)")
+        print("3) linux-zen (Tuned for desktop performance)")
+        print("4) linux-hardened (Security-focused kernel)")
+        print("5) Return to main menu")
+        
+        choice = input("Enter your choice: ")
+        
+        if choice == "1":
+            run_command("pacman -S linux linux-headers")
+            print("Standard Arch Kernel installed.")
+            
+        elif choice == "2":
+            run_command("pacman -S linux-lts linux-lts-headers")
+            print("Long Term Support Kernel installed.")
+            
+        elif choice == "3":
+            run_command("pacman -S linux-zen linux-zen-headers")
+            print("Zen Kernel installed.")
+            
+        elif choice == "4":
+            run_command("pacman -S linux-hardened linux-hardened-headers")
+            print("Hardened Kernel installed.")
+            
+        elif choice == "5":
+            return
+        else:
+            print("Invalid choice!")
+        input("Press any key to return to the kernel selector...")
+
 
 def main():
     while True:
@@ -302,16 +551,20 @@ def main():
         print("7) Chroot into system")
         print("8) Set time zone")
         print("9) Localization")
-        print("10) Network configuration")
-        print("11) Install KDE packages")
-        print("12) Install additional packages")
-        print("13) Install custom packages")
-        print("14) Setup zRAM")
-        print("15) Enable necessary services")
-        print("16) Configure pacman repositories")
-        print("17) Setup Chaotic-AUR")
-        print("18) Setup CachyOS Repository")
-        print("19) Quit")
+        print("10) Set hostname")
+        print("11) Network configuration")
+        print("12) Kernel Selector")
+        print("13) Set root password")
+        print("14) Create a new user")
+        print("15) Desktop Environment Installation")
+        print("16) Install additional packages")
+        print("17) Install custom packages")
+        print("18) Enable necessary services")
+        print("19) Setup zRAM")
+        print("20) Configure pacman repositories")
+        print("21) Setup Chaotic-AUR")
+        print("22) Setup CachyOS Repository")
+        print("23) Quit")
         choice = input("Enter your choice: ")
 
         if choice == "1":
@@ -333,29 +586,38 @@ def main():
         elif choice == "9":
             localization()
         elif choice == "10":
-            network_configuration()
+            set_hostname()
         elif choice == "11":
-            install_kde_packages()
+            network_configuration()
         elif choice == "12":
-            install_additional_packages()
+            kernel_selector()
         elif choice == "13":
-            install_custom_packages()
+            set_root_password()
         elif choice == "14":
-            setup_zram()
+            create_user()
         elif choice == "15":
-            enable_services()
+            install_desktop_environment()
         elif choice == "16":
-            configure_pacman_repos()
+            install_additional_packages()
         elif choice == "17":
-            setup_chaotic_aur()
+            install_custom_packages()
         elif choice == "18":
-            setup_cachyos_repo()
+            enable_services()
         elif choice == "19":
+            setup_zram()
+        elif choice == "20":
+            configure_pacman_repos()
+        elif choice == "21":
+            setup_chaotic_aur()
+        elif choice == "22":
+            setup_cachyos_repo()
+        elif choice == "23":
             print("Exiting...")
             break
         else:
             print("Invalid choice!")
         input("Press any key to return to the main menu...")
+
 
 
 if __name__ == "__main__":
